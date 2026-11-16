@@ -1,0 +1,6 @@
+# Runtime data can contain local paths, previous proxy settings and drafts.
+backups/
+diagnostics/
+Antigravity-launch-status*.json
+proxy-config.json
+*.log

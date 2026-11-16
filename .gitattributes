@@ -1,0 +1,6 @@
+# Keep embedded runtime sources byte-for-byte identical across Git checkouts.
+*.bat -text
+*.cmd -text
+*.ps1 -text
+launcher-src/*.cs -text
+launcher-src/*.js -text
