@@ -43,3 +43,4 @@
 
 仓库包含可直接查看的 PowerShell、C# 和 JavaScript 源码。修改源码后，在本目录运行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\build-single-file.ps1`，即可重新生成包含最新源码的 `一键启动.bat`。运行程序不需要安装 Node.js、Python 或额外的 PowerShell 模块。
 
+Community: [LINUX DO](https://linux.do/)
