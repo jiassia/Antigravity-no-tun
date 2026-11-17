@@ -19,6 +19,8 @@ $script:ShortcutCache = $null
 $script:RunLock = $null
 $script:OwnLock = $false
 . (Join-Path $script:Root 'launcher-src\ProxyBridge.ps1')
+. (Join-Path $script:Root 'launcher-src\CliEnvironment.ps1')
+. (Join-Path $script:Root 'launcher-src\WindowsProxy.ps1')
 function Write-Stage([int]$Number, [string]$Text) {
     Write-Host ('['+(Get-Date -Format 'HH:mm:ss')+'] ['+$Number+'/6] '+$Text) -ForegroundColor Cyan
 }
@@ -67,7 +69,7 @@ function Find-Apps {
         if ($p.Name -ieq 'Antigravity.exe' -and $p.ExecutablePath) { $guiCandidates.Add($p.ExecutablePath) }
         if ($p.Name -ieq 'agy.exe' -and $p.ExecutablePath) { $cliCandidates.Add($p.ExecutablePath) }
     }
-    foreach ($name in @('agy.exe','agy.cmd','agy','antigravity.exe','antigravity.cmd','antigravity')) {
+    foreach ($name in @('agy.exe','agy.cmd','agy.bat','agy','antigravity.exe','antigravity.cmd','antigravity')) {
         foreach ($cmd in @(Get-Command $name -CommandType Application -All -ErrorAction SilentlyContinue)) {
             if ($cmd.Source -and (Test-Path -LiteralPath $cmd.Source -PathType Leaf)) {
                 if ($name -like 'agy*') { $cliCandidates.Add($cmd.Source) }
@@ -110,8 +112,8 @@ function Find-Apps {
     }
     foreach ($base in @($env:LOCALAPPDATA,$env:USERPROFILE,$env:APPDATA)) {
         if (-not $base) { continue }
-        foreach ($sub in @('agy\bin\agy.exe','agy\bin\agy.cmd','.agy\bin\agy.exe','.agy\bin\agy.cmd',
-            '.antigravity\bin\agy.exe','.antigravity\bin\agy.cmd','scoop\shims\agy.exe','scoop\shims\agy.cmd','npm\agy.cmd')) {
+        foreach ($sub in @('agy\bin\agy.exe','agy\bin\agy.cmd','agy\bin\agy.bat','.agy\bin\agy.exe','.agy\bin\agy.cmd','.agy\bin\agy.bat',
+            '.antigravity\bin\agy.exe','.antigravity\bin\agy.cmd','.antigravity\bin\agy.bat','scoop\shims\agy.exe','scoop\shims\agy.cmd','scoop\shims\agy.bat','npm\agy.cmd','npm\agy.bat')) {
             $cliCandidates.Add((Join-Path $base $sub))
         }
     }
@@ -131,16 +133,20 @@ function Find-Apps {
         }
     }
     $old=Read-State
-    if ($old -and $old.appPath) { $guiCandidates.Add($old.appPath) }
-    if ($old -and $old.cliPath) { $cliCandidates.Add($old.cliPath) }
-    $script:Gui=$guiCandidates | Where-Object { (Test-Path -LiteralPath $_ -PathType Leaf) -and [IO.Path]::GetFileName($_) -ieq 'Antigravity.exe' } | Select-Object -First 1
+    if ($old -and $old.appPath -is [string] -and $old.appPath) { $guiCandidates.Add($old.appPath) }
+    if ($old -and $old.cliPath -is [string] -and $old.cliPath) { $cliCandidates.Add($old.cliPath) }
+    $script:Gui=$null
+    $guiMatch=$guiCandidates | Where-Object { (Test-Path -LiteralPath $_ -PathType Leaf) -and [IO.Path]::GetFileName($_) -ieq 'Antigravity.exe' } | Select-Object -First 1
+    if ($guiMatch) { $script:Gui=[string]$guiMatch }
     if ($script:Gui) {
         $appDir=Split-Path $script:Gui -Parent
-        foreach ($sub in @('bin\agy.exe','bin\agy.cmd','resources\app\bin\agy.exe','resources\app\bin\agy.cmd')) {
+        foreach ($sub in @('bin\agy.exe','bin\agy.cmd','bin\agy.bat','resources\app\bin\agy.exe','resources\app\bin\agy.cmd','resources\app\bin\agy.bat')) {
             $cliCandidates.Add((Join-Path $appDir $sub))
         }
     }
-    $script:Cli=$cliCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+    $script:Cli=$null
+    $cliMatch=$cliCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+    if ($cliMatch) { $script:Cli=[string]$cliMatch }
     if (-not $script:Gui -and -not $script:Cli) { throw '没有找到 Antigravity 或 agy CLI。请先安装软件；便携安装可在 proxy-config.json 指定 appPath / cliPath。' }
 }
 function Test-Port([uri]$Uri) {
@@ -382,7 +388,9 @@ function Set-ProxyEnvironment([switch]$Persist) {
             $state=[pscustomobject]@{created=(Get-Date).ToString('o');appPath=$script:Gui;cliPath=$script:Cli; environment=[pscustomobject]$original;shortcuts=@()}
             Save-State $state
         }
+        if ($script:Cli) { Ensure-CliPath $script:Cli $state | Out-Null }
         if ($script:Bridge) { Set-BridgeStartup $state }
+        Set-WindowsProxy $script:Proxy $state | Out-Null
         if (-not $state.appliedEnvironment) {
             $state | Add-Member -NotePropertyName appliedEnvironment -NotePropertyValue ([pscustomobject]@{}) -Force
         }
@@ -534,6 +542,8 @@ function Restore-Settings {
             Set-UserEnvironment $prop.Name $prop.Value
         } catch { $errors.Add('环境变量恢复失败：'+$prop.Name) }
     }
+    try { Restore-CliPath $state | Out-Null } catch { $errors.Add('agy 命令路径恢复失败。') }
+    try { Restore-WindowsProxy $state | Out-Null } catch { $errors.Add('Windows 代理设置恢复失败。') }
     try { Remove-BridgeStartup $state } catch { $errors.Add('本机代理转换服务的自启动项恢复失败。') }
     Stop-OwnedBridges
     Broadcast-Environment
@@ -556,7 +566,10 @@ try {
     }
     Write-Stage 1 '查找 Antigravity GUI 和 agy CLI 安装位置'
     Find-Apps
-    if ($Mode -eq 'Launch' -and -not $script:Gui) { throw '没有找到 Antigravity 软件，请先安装后重试。' }
+    if ($Mode -eq 'Launch' -and -not $script:Gui -and $script:Cli) {
+        Write-Host '未找到图形界面，正在配置并启动 agy CLI。'
+        $Mode='Cli'
+    }
     if ($Mode -eq 'Cli' -and -not $script:Cli) { throw '没有找到 agy CLI，请先安装后重试。' }
     Write-Host ('GUI: '+$script:Gui); Write-Host ('CLI: '+$script:Cli)
     Write-Stage 2 '检测普通代理并验证网络连接'
@@ -573,10 +586,16 @@ try {
     if ($Mode -eq 'Cli') {
         if (-not $script:Cli) { throw '没有找到 agy CLI。请先安装 CLI。' }
         $env:AGY_PROXY_CLI=$script:Cli
-        $env:PATH=(Split-Path $script:Cli -Parent)+';'+$env:PATH
-        Write-Host '已打开普通代理终端。输入 agy 即可使用，输入 exit 关闭。'
+        Write-Host '已配置代理，正在启动 agy CLI。'
         Write-Status 'cli_ready' 'CLI 终端已继承代理环境。'
-        & $env:ComSpec /d /k 'title agy - HTTP proxy'
+        # Do not hold the setup lock during an interactive CLI session.
+        if ($script:RunLock) {
+            if ($script:OwnLock) { $script:RunLock.ReleaseMutex(); $script:OwnLock=$false }
+            $script:RunLock.Dispose(); $script:RunLock=$null
+        }
+        & $script:Cli
+        if ($LASTEXITCODE) { throw ('agy CLI 已退出，退出码：'+$LASTEXITCODE) }
+        exit 0
     }
     Write-Status 'configured' '已配置普通代理和启动入口。已打开的终端需要重新打开。'
     Write-Stage 6 '完成'

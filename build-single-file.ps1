@@ -7,7 +7,7 @@ $files=@(
     'launcher.ps1', 'Antigravity优化.ps1',
     'launcher-src\DetachedProcess.cs', 'launcher-src\GuiSession.ps1',
     'launcher-src\GuiSessionTransport.cs', 'launcher-src\capture-gui-drafts.js',
-    'launcher-src\restore-gui-drafts.js', 'launcher-src\ProxyBridge.ps1', 'launcher-src\SocksBridge.cs',
+    'launcher-src\restore-gui-drafts.js', 'launcher-src\ProxyBridge.ps1', 'launcher-src\CliEnvironment.ps1', 'launcher-src\WindowsProxy.ps1', 'launcher-src\SocksBridge.cs',
     'launcher-src\SocksBridge.ps1'
 )
 

@@ -60,7 +60,7 @@ try {
         $files=@('launcher.ps1','Antigravity优化.ps1',
             'launcher-src\DetachedProcess.cs','launcher-src\GuiSession.ps1',
             'launcher-src\GuiSessionTransport.cs','launcher-src\capture-gui-drafts.js',
-            'launcher-src\restore-gui-drafts.js','launcher-src\ProxyBridge.ps1','launcher-src\SocksBridge.cs',
+            'launcher-src\restore-gui-drafts.js','launcher-src\ProxyBridge.ps1','launcher-src\CliEnvironment.ps1','launcher-src\WindowsProxy.ps1','launcher-src\SocksBridge.cs',
             'launcher-src\SocksBridge.ps1')
         foreach ($file in $files) {
             if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $file) -PathType Leaf)) {
@@ -104,12 +104,12 @@ echo.
 pause
 '@
             [IO.File]::WriteAllText($restorePath,($restore -replace "`r?`n","`r`n"),[Text.Encoding]::ASCII)
-            & (Join-Path $runtime 'launcher.ps1') -Mode $Mode -NoDelay:$NoDelay -Installed
-            $result=$LASTEXITCODE
         } finally {
             if ($ownInstallLock) { $installLock.ReleaseMutex() }
             $installLock.Dispose()
         }
+        & (Join-Path $runtime 'launcher.ps1') -Mode $Mode -NoDelay:$NoDelay -Installed
+        $result=$LASTEXITCODE
         exit $result
     }
 
