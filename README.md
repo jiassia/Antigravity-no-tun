@@ -1,6 +1,6 @@
 # Antigravity-no-tun
 
-在 Windows 上自动查找 Antigravity、检测本机代理并配置启动环境。
+在 Windows 上自动查找 Antigravity 和 `agy` CLI，检测本机代理并配置启动环境，无需开启 TUN。
 
 **[下载一键启动文件](https://github.com/jiassia/Antigravity-no-tun/releases/latest/download/Antigravity-No-TUN.bat)**
 
@@ -20,10 +20,22 @@
 
 1. 查找 Antigravity 和本地代理，必要时尝试启动已安装的代理客户端。
 2. 记录原有设置，为当前用户配置 Windows 系统代理和 `HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY`、`NO_PROXY` 环境变量。其他使用系统代理或这些变量的程序也可能使用该代理。使用 SOCKS5 转换时，程序还会为转换服务创建当前用户的登录启动项。
-3. 检测到 `agy` CLI 时，自动配置其命令路径。完全退出并重新打开终端后，可以直接运行 `agy`。如果只安装了 CLI，脚本会直接启动它。
-4. 备份并更新 Antigravity 快捷方式，然后启动软件。已打开的终端需要完全退出后重新打开，才能读取新的用户环境变量。
+3. 检测到 `agy` CLI 时，自动配置其命令路径。
+4. 如果安装了图形界面，备份并更新 Antigravity 快捷方式，然后启动软件；如果只安装了 CLI，则直接启动 CLI。
 
 当已有 Antigravity 窗口需要重启时，程序会尝试保存并核对输入草稿，再正常关闭窗口。应用接口不可用或窗口未正常退出时，程序会保留现有进程并提示原因。应用版本更新可能改变草稿接口。
+
+## 使用 agy CLI
+
+安装 `agy` CLI 后，双击最新的 **一键启动.bat**。脚本会自动为 CLI 配置代理和命令路径。
+
+如果同时安装了图形界面，配置完成后请完全退出并重新打开终端，然后运行：
+
+```text
+agy
+```
+
+如果只安装了 CLI，脚本配置完成后会直接启动它。Windows Terminal 需要退出全部窗口后重新打开，才能读取新的用户环境变量。
 
 ## 恢复原设置
 
